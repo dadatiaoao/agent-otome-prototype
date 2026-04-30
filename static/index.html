@@ -15,7 +15,7 @@
         <div class="grid">
           <label>
             Base URL
-            <input id="baseUrl" type="text" placeholder="https://api.openai.com/v1" />
+            <input id="baseUrl" type="text" placeholder="https://api.deepseek.com" />
           </label>
           <label>
             API Key
@@ -23,10 +23,14 @@
           </label>
           <label>
             Model Name
-            <input id="modelName" type="text" placeholder="gpt-4o-mini 或 deepseek-chat" />
+            <input id="modelName" type="text" placeholder="deepseek-v4-flash" />
           </label>
         </div>
         <div class="actions">
+          <label class="inline-check">
+            <input id="disableThinking" type="checkbox" checked />
+            关闭 DeepSeek 思考模式
+          </label>
           <button id="saveConfigBtn">保存配置</button>
           <button id="testModelBtn">测试模型</button>
           <span id="configStatus" class="status"></span>

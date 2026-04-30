@@ -36,7 +36,7 @@ INITIAL_STATE: Dict[str, Any] = {
         "B": {
             "emotions": ["好奇", "试探"],
             "beliefs_about_player": [],
-            "intention": "用轻松方式接近玩家",
+            "intention": "用轟松方式接近玩家",
         },
         "C": {
             "emotions": ["安静", "警觉"],
@@ -53,6 +53,7 @@ class ApiConfig(BaseModel):
     base_url: str
     api_key: str
     model: str
+    disable_thinking: bool = True
 
 
 class TestModelRequest(ApiConfig):
@@ -276,26 +277,50 @@ async def post_chat_completion(
     use_response_format: bool = True,
 ) -> Dict[str, Any]:
     url = f"{normalize_base_url(config.base_url)}/chat/completions"
-    payload: Dict[str, Any] = {
-        "model": config.model.strip(),
-        "messages": messages,
-        "temperature": temperature,
-    }
-    if use_response_format:
-        payload["response_format"] = {"type": "json_object"}
-
     headers = {
         "Authorization": f"Bearer {config.api_key}",
         "Content-Type": "application/json",
     }
 
+    attempts = [
+        (use_response_format, config.disable_thinking),
+        (False, config.disable_thinking),
+        (use_response_format, False),
+        (False, False),
+    ]
+    seen_attempts = set()
+    last_response: Optional[httpx.Response] = None
+
     async with httpx.AsyncClient(timeout=60) as client:
-        response = await client.post(url, headers=headers, json=payload)
-        if response.status_code >= 400 and use_response_format:
-            payload.pop("response_format", None)
+        for include_response_format, include_thinking in attempts:
+            key = (include_response_format, include_thinking)
+            if key in seen_attempts:
+                continue
+            seen_attempts.add(key)
+
+            payload: Dict[str, Any] = {
+                "model": config.model.strip(),
+                "messages": messages,
+                "temperature": temperature,
+            }
+            if include_response_format:
+                payload["response_format"] = {"type": "json_object"}
+            if include_thinking:
+                payload["thinking"] = {"type": "disabled"}
+
             response = await client.post(url, headers=headers, json=payload)
-        response.raise_for_status()
-        return response.json()
+            last_response = response
+            if response.status_code < 400:
+                return response.json()
+
+            # Retry only likely parameter-compatibility failures. Auth, quota,
+            # and server errors should surface directly.
+            if response.status_code not in (400, 422):
+                response.raise_for_status()
+
+        assert last_response is not None
+        last_response.raise_for_status()
+        return last_response.json()
 
 
 def get_message_content(response_json: Dict[str, Any]) -> str:

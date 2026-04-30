@@ -46,6 +46,17 @@ label {
   font-weight: 600;
 }
 
+.inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.inline-check input {
+  width: auto;
+}
+
 input,
 textarea {
   width: 100%;

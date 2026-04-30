@@ -30,6 +30,7 @@ const els = {
   baseUrl: document.querySelector("#baseUrl"),
   apiKey: document.querySelector("#apiKey"),
   modelName: document.querySelector("#modelName"),
+  disableThinking: document.querySelector("#disableThinking"),
   saveConfigBtn: document.querySelector("#saveConfigBtn"),
   testModelBtn: document.querySelector("#testModelBtn"),
   configStatus: document.querySelector("#configStatus"),
@@ -54,9 +55,10 @@ function clone(value) {
 function loadConfig() {
   const saved = JSON.parse(localStorage.getItem("api_config") || "{}");
   return {
-    base_url: saved.base_url || "https://api.openai.com/v1",
+    base_url: saved.base_url || "https://api.deepseek.com",
     api_key: saved.api_key || "",
-    model: saved.model || "gpt-4o-mini",
+    model: saved.model || "deepseek-v4-flash",
+    disable_thinking: saved.disable_thinking !== false,
   };
 }
 
@@ -71,6 +73,7 @@ function readConfig() {
     base_url: els.baseUrl.value.trim(),
     api_key: els.apiKey.value.trim(),
     model: els.modelName.value.trim(),
+    disable_thinking: els.disableThinking.checked,
   };
 }
 
@@ -281,6 +284,7 @@ function exportDebugJson() {
     api_config: {
       base_url: config.base_url,
       model: config.model,
+      disable_thinking: config.disable_thinking,
     },
     state,
     conversation_log: state.conversation_log || [],
@@ -301,6 +305,7 @@ function init() {
   els.baseUrl.value = config.base_url;
   els.apiKey.value = config.api_key;
   els.modelName.value = config.model;
+  els.disableThinking.checked = config.disable_thinking;
 
   els.saveConfigBtn.addEventListener("click", saveConfig);
   els.testModelBtn.addEventListener("click", testModel);
