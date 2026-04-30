@@ -102,7 +102,33 @@ button:disabled {
 
 .story {
   display: grid;
+  gap: 14px;
+}
+
+.turn {
+  display: grid;
   gap: 10px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #d8dde3;
+}
+
+.turn:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.turn-header {
+  font-size: 13px;
+  font-weight: 700;
+  color: #4b5563;
+}
+
+.player-action {
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 3px solid #9aa4b2;
+  background: #ffffff;
+  line-height: 1.7;
 }
 
 .narration,

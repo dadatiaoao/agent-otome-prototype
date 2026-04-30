@@ -100,13 +100,7 @@ function renderAgentOutput(output) {
   els.agentOutput.textContent = JSON.stringify(output || {}, null, 2);
 }
 
-function renderStory(dialogue) {
-  if (!dialogue) {
-    els.story.innerHTML =
-      '<p class="muted">尚未开始。输入一轮行动后，这里会显示旁白、角色台词和下一步提示。</p>';
-    return;
-  }
-
+function renderDialogue(dialogue) {
   const lines = (dialogue.lines || [])
     .map(
       (line) => `
@@ -119,11 +113,32 @@ function renderStory(dialogue) {
     )
     .join("");
 
-  els.story.innerHTML = `
+  return `
     <p class="narration">${escapeHtml(dialogue.narration || "")}</p>
     ${lines}
     <p class="prompt"><strong>下一步：</strong>${escapeHtml(dialogue.prompt_to_player || "")}</p>
   `;
+}
+
+function renderStory() {
+  const log = Array.isArray(state.conversation_log) ? state.conversation_log : [];
+  if (log.length === 0) {
+    els.story.innerHTML =
+      '<p class="muted">尚未开始。输入一轮行动后，这里会显示旁白、角色台词和下一步提示。</p>';
+    return;
+  }
+
+  els.story.innerHTML = log
+    .map(
+      (entry) => `
+        <article class="turn">
+          <div class="turn-header">第 ${escapeHtml(entry.turn || "")} 轮</div>
+          <p class="player-action"><strong>玩家：</strong>${escapeHtml(entry.player_input || "")}</p>
+          ${renderDialogue(entry.dialogue || {})}
+        </article>
+      `
+    )
+    .join("");
 }
 
 function escapeHtml(text) {
@@ -201,7 +216,7 @@ async function sendTurn() {
       lastAgentOutput = result.agent_output;
       state = result.new_state;
       saveState();
-      renderStory(result.agent_output.dialogue);
+      renderStory();
       renderAgentOutput(lastAgentOutput);
       renderState();
       els.playerInput.value = "";
@@ -254,7 +269,7 @@ async function resetSession() {
   }
   lastAgentOutput = null;
   saveState();
-  renderStory(null);
+  renderStory();
   renderAgentOutput(null);
   renderState();
   setStatus(els.turnStatus, "会话已重置。", "ok");
@@ -294,7 +309,7 @@ function init() {
   els.resetBtn.addEventListener("click", resetSession);
   els.exportBtn.addEventListener("click", exportDebugJson);
 
-  renderStory(null);
+  renderStory();
   renderAgentOutput(null);
   renderState();
 }
