@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>6 层 Agent AI 乙游 / 群像对话原型</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <h1>6 层 Agent 对话原型</h1>
+
+      <section class="panel">
+        <h2>API 配置</h2>
+        <div class="grid">
+          <label>
+            Base URL
+            <input id="baseUrl" type="text" placeholder="https://api.openai.com/v1" />
+          </label>
+          <label>
+            API Key
+            <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" />
+          </label>
+          <label>
+            Model Name
+            <input id="modelName" type="text" placeholder="gpt-4o-mini 或 deepseek-chat" />
+          </label>
+        </div>
+        <div class="actions">
+          <button id="saveConfigBtn">保存配置</button>
+          <button id="testModelBtn">测试模型</button>
+          <span id="configStatus" class="status"></span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>玩家输入</h2>
+        <textarea
+          id="playerInput"
+          rows="4"
+          placeholder="输入一句自然语言行为，例如：我先安抚 B，然后让 C 把记录发给我，最后告诉 A 我相信他的判断。"
+        ></textarea>
+        <div class="actions">
+          <button id="suggestInputBtn">AI 生成参考输入</button>
+          <button id="sendBtn">发送</button>
+          <button id="resetBtn">重置会话</button>
+          <button id="exportBtn">导出调试 JSON</button>
+          <span id="turnStatus" class="status"></span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>玩家可见剧情</h2>
+        <div id="story" class="story">
+          <p class="muted">尚未开始。输入一轮行动后，这里会显示旁白、角色台词和下一步提示。</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <details>
+          <summary>开发者面板：6 层 Agent JSON</summary>
+          <pre id="agentOutput">{}</pre>
+        </details>
+      </section>
+
+      <section class="panel">
+        <h2>当前状态 JSON</h2>
+        <pre id="stateOutput">{}</pre>
+      </section>
+    </main>
+
+    <script src="/static/main.js"></script>
+  </body>
+</html>

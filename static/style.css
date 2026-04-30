@@ -1,0 +1,158 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, "Microsoft YaHei", sans-serif;
+  color: #202124;
+  background: #f6f7f8;
+}
+
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+h1 {
+  margin: 0 0 18px;
+  font-size: 26px;
+}
+
+h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.panel {
+  margin-bottom: 16px;
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #d8dde3;
+  border-radius: 6px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+input,
+textarea {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #b8c0cc;
+  border-radius: 4px;
+  font: inherit;
+  font-weight: 400;
+  background: #ffffff;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+button {
+  padding: 8px 12px;
+  border: 1px solid #808996;
+  border-radius: 4px;
+  background: #f2f4f7;
+  color: #202124;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #e7ebf0;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.status {
+  min-height: 20px;
+  font-size: 14px;
+}
+
+.status.ok {
+  color: #137333;
+}
+
+.status.error {
+  color: #b3261e;
+}
+
+.story {
+  display: grid;
+  gap: 10px;
+}
+
+.narration,
+.prompt {
+  margin: 0;
+  line-height: 1.7;
+}
+
+.line {
+  padding: 8px 10px;
+  border-left: 3px solid #5f6f89;
+  background: #f8fafc;
+  line-height: 1.7;
+}
+
+.speaker {
+  font-weight: 700;
+}
+
+.emotion {
+  color: #5f6368;
+}
+
+.muted {
+  color: #6b7280;
+}
+
+summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+pre {
+  overflow: auto;
+  max-height: 460px;
+  padding: 12px;
+  border: 1px solid #d8dde3;
+  border-radius: 4px;
+  background: #f8fafc;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 760px) {
+  .page {
+    padding: 14px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

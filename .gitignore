@@ -1,0 +1,7 @@
+__pycache__/
+.git-local/
+.venv/
+.pip-temp/
+.env
+*.pyc
+*.log
