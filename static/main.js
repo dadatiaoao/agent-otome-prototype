@@ -1,25 +1,28 @@
 const INITIAL_STATE = {
   turn: 0,
   world_state: {
-    scene_goal: "维持协作并推进当前项目",
-    pressure: "中等",
+    scene_goal: "在资源不透明的协作实验中暴露真实优先级",
+    pressure: "偏高",
+    experiment_frame: "三名角色知道自己在协作实验中，但不知道评价标准是否一致。",
+    active_fault_line: "公开效率、私人信任、边界感三者无法同时被满足。",
+    scarce_resource: "下一步只有一个人的方案能被优先采纳。",
     recent_public_events: [],
   },
   characters: {
     A: {
-      emotions: ["克制", "观察"],
+      emotions: ["克制", "被测试感"],
       beliefs_about_player: [],
-      intention: "观察玩家如何处理协作压力",
+      intention: "确认玩家是否只在需要正确答案时才靠近自己",
     },
     B: {
-      emotions: ["好奇", "试探"],
+      emotions: ["轻快", "不安"],
       beliefs_about_player: [],
-      intention: "用轻松方式接近玩家",
+      intention: "争取让自己的判断被当成有效信息而不是情绪缓冲",
     },
     C: {
-      emotions: ["安静", "警觉"],
+      emotions: ["安静", "戒备"],
       beliefs_about_player: [],
-      intention: "先观察，再用行动提供帮助",
+      intention: "守住边界，同时验证玩家是否会主动分配可见责任",
     },
   },
   open_threads: [],
@@ -52,6 +55,31 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function mergeInitialState(defaultState, savedState) {
+  const merged = clone(defaultState);
+  if (!savedState || typeof savedState !== "object") {
+    return merged;
+  }
+  Object.entries(savedState).forEach(([key, value]) => {
+    if (!(key in merged)) {
+      return;
+    }
+    if (
+      merged[key] &&
+      value &&
+      typeof merged[key] === "object" &&
+      !Array.isArray(merged[key]) &&
+      typeof value === "object" &&
+      !Array.isArray(value)
+    ) {
+      merged[key] = mergeInitialState(merged[key], value);
+    } else {
+      merged[key] = value;
+    }
+  });
+  return merged;
+}
+
 function loadConfig() {
   const saved = JSON.parse(localStorage.getItem("api_config") || "{}");
   return {
@@ -80,7 +108,7 @@ function readConfig() {
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem("state") || "null");
-    return saved || clone(INITIAL_STATE);
+    return mergeInitialState(INITIAL_STATE, saved);
   } catch {
     return clone(INITIAL_STATE);
   }
@@ -244,7 +272,7 @@ async function suggestInput() {
   }
 
   els.suggestInputBtn.disabled = true;
-  setStatus(els.turnStatus, "正在生成参考输入...");
+  setStatus(els.turnStatus, "正在生成推进输入...");
   try {
     const result = await postJson("/api/suggest_input", {
       ...config,
@@ -253,9 +281,9 @@ async function suggestInput() {
     if (result.ok) {
       els.playerInput.value = result.player_input || "";
       els.playerInput.focus();
-      setStatus(els.turnStatus, "已生成一条可编辑的参考输入。", "ok");
+      setStatus(els.turnStatus, "已生成一条可编辑的推进输入。", "ok");
     } else {
-      setStatus(els.turnStatus, result.error || "参考输入生成失败。", "error");
+      setStatus(els.turnStatus, result.error || "推进输入生成失败。", "error");
     }
   } catch (err) {
     setStatus(els.turnStatus, err.message, "error");
