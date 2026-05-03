@@ -159,7 +159,9 @@ function renderStory() {
     return;
   }
 
-  els.story.innerHTML = log
+  const newestFirstLog = [...log].reverse();
+
+  els.story.innerHTML = newestFirstLog
     .map(
       (entry) => `
         <article class="turn">
