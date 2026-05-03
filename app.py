@@ -16,32 +16,35 @@ BASE_DIR = Path(__file__).parent
 STATIC_DIR = BASE_DIR / "static"
 PROMPT_PATH = BASE_DIR / "prompts" / "system_prompt.txt"
 
-app = FastAPI(title="6-Layer Agent Otome Dialogue Prototype")
+app = FastAPI(title="6-Layer Agent Social Experiment Dialogue Prototype")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 INITIAL_STATE: Dict[str, Any] = {
     "turn": 0,
     "world_state": {
-        "scene_goal": "维持协作并推进当前项目",
-        "pressure": "中等",
+        "scene_goal": "在资源不透明的协作实验中暴露真实优先级",
+        "pressure": "偏高",
+        "experiment_frame": "三名角色知道自己在协作实验中，但不知道评价标准是否一致。",
+        "active_fault_line": "公开效率、私人信任、边界感三者无法同时被满足。",
+        "scarce_resource": "下一步只有一个人的方案能被优先采纳。",
         "recent_public_events": [],
     },
     "characters": {
         "A": {
-            "emotions": ["克制", "观察"],
+            "emotions": ["克制", "被测试感"],
             "beliefs_about_player": [],
-            "intention": "观察玩家如何处理协作压力",
+            "intention": "确认玩家是否只在需要正确答案时才靠近自己",
         },
         "B": {
-            "emotions": ["好奇", "试探"],
+            "emotions": ["轻快", "不安"],
             "beliefs_about_player": [],
-            "intention": "用轟松方式接近玩家",
+            "intention": "争取让自己的判断被当成有效信息而不是情绪缓冲",
         },
         "C": {
-            "emotions": ["安静", "警觉"],
+            "emotions": ["安静", "戒备"],
             "beliefs_about_player": [],
-            "intention": "先观察，再用行动提供帮助",
+            "intention": "守住边界，同时验证玩家是否会主动分配可见责任",
         },
     },
     "open_threads": [],
@@ -159,14 +162,23 @@ def normalize_base_url(base_url: str) -> str:
     return base_url.strip().rstrip("/")
 
 
+def merge_initial_state(default: Dict[str, Any], incoming: Dict[str, Any]) -> Dict[str, Any]:
+    merged = deepcopy(default)
+    for key, value in incoming.items():
+        if key not in merged:
+            continue
+        if isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = merge_initial_state(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
 def safe_state(state: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     if not isinstance(state, dict):
         return deepcopy(INITIAL_STATE)
-    merged = deepcopy(INITIAL_STATE)
-    for key, value in state.items():
-        if key in merged:
-            merged[key] = value
-    return merged
+    return merge_initial_state(INITIAL_STATE, state)
+
 
 
 def last_items(values: List[Any], limit: int) -> List[Any]:
@@ -377,21 +389,24 @@ async def generate_suggested_input(config: ApiConfig, state: Dict[str, Any]) -> 
             "content": (
                 "你是一个受约束的玩家输入建议器。只输出合法 JSON，不要输出 Markdown。"
                 "不要替玩家做重大决定，不要新增地点、组织、阴谋、战斗、死亡或突然离场。"
+                "目标不是讨好角色，而是提出一个能暴露关系张力、推进小事件的可执行行动。"
             ),
         },
         {
             "role": "user",
             "content": (
                 "请根据当前状态，生成一句适合下一轮输入框使用的中文玩家行动。"
-                "要求：一句话，25 到 80 个中文字符；只推进一个小事件；可以同时照顾 A、B、C 的不同感受；"
-                "不要写角色台词，不要写旁白。"
+                "要求：一句话，35 到 90 个中文字符；只推进一个小事件；必须包含一个具体动作和一个可被角色误解或质疑的取舍；"
+                "优先让玩家提出边界、排序、交换条件、公开验证、延迟回应或分配责任；"
+                "不要只安抚、只表白信任、只询问信息，也不要让所有人都被完美照顾；"
+                "不要写角色台词，不要写旁白，不要替角色回应。"
                 "\n当前状态 JSON：\n"
                 f"{json.dumps(state, ensure_ascii=False, indent=2)}"
                 '\n输出格式：{"player_input":"..."}'
             ),
         },
     ]
-    response_json = await post_chat_completion(config, messages, temperature=0.8)
+    response_json = await post_chat_completion(config, messages, temperature=0.9)
     raw_output = get_message_content(response_json)
     parsed = extract_json(raw_output)
     suggestion = SuggestedInput.model_validate(parsed)
