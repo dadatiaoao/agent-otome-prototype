@@ -75,6 +75,12 @@ POST {base_url}/chat/completions
 
 系统 prompt 位于 `prompts/system_prompt.txt`。后端 schema 与校验逻辑位于 `app.py`。
 
+## 规则修改
+
+背景、人物性格、导演原则、硬约束、自动玩家输入和固定 JSON 格式的修改方法见：
+
+- [`docs/rule_editing_guide.md`](docs/rule_editing_guide.md)
+
 ## 常见问题
 
 ### 模型不支持 response_format
