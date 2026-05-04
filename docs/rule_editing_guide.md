@@ -29,10 +29,10 @@
 建议写法：
 
 - 第一段说明玩家、角色、当前场景和基本压力。
-- 第二段说明这个原型的核心体验，例如社交实验、协作压力、亲密关系、悬疑观察等。
+- 第二段说明这个原型的核心体验，例如温和协作、亲密关系、群像误读、共创会筹备等。
 - `场景默认张力` 用项目符号列出 3 到 6 条稳定规则。
 
-不要在这里写固定剧情结局。更适合写“会反复出现的压力来源”，例如信息不对称、公开责任、资源稀缺、边界被试探。
+不要在这里写固定剧情结局。更适合写“会反复出现的压力来源”，例如信息不对称、公开署名、开场名额、边界被试探。
 
 ### 人物性格
 
@@ -102,16 +102,18 @@ A：
 修改 `app.py` 里的 `generate_suggested_input(...)`。重点是这个 system/user prompt：
 
 ```python
-"你是一个受约束的玩家输入建议器。只输出合法 JSON，不要输出 Markdown。"
+"你在模拟一个人在旧书屋共创会里，刚刚有了一个行动冲动的那一刻。"
 ...
-"要求：一句话，35 到 90 个中文字符；只推进一个小事件；..."
+"要求：40 到 80 个中文字符；有具体的物理动作或语言；必须明确推进一个筹备事项；有一个细节是只有某一个人能接收到的；..."
 ```
 
 这里控制“AI 生成推进输入”按钮的行为。适合定义：
 
 - 玩家输入的字数范围。
-- 是否必须包含具体动作。
-- 是否必须包含取舍、排序、交换条件或公开验证。
+- 是否必须包含具体动作、物件、位置或一句自然说出口的话。
+- 是否必须推进一个具体筹备事项，例如开场顺序、署名、留言展示范围、朗读人选或旧物摆放。
+- 是否要让空气里留下只被某个人接收到的细节。
+- 是否需要避免任务式表态，例如“我决定”“我提议”“我宣布”。
 - 禁止生成哪些输入，例如告白、离场、战斗、重大决定。
 
 固定输出格式是：
@@ -133,6 +135,7 @@ A：
 
 ```json
 {
+  "schema_version": 2,
   "turn": 0,
   "world_state": {
     "scene_goal": "...",
@@ -140,16 +143,31 @@ A：
     "experiment_frame": "...",
     "active_fault_line": "...",
     "scarce_resource": "...",
+    "route_lean": "neutral",
     "recent_public_events": []
   },
   "characters": {
     "A": {
+      "affinity": 0,
+      "distance": "stranger",
+      "mask_on": true,
+      "cracked_at": [],
       "emotions": ["...", "..."],
       "beliefs_about_player": [],
       "intention": "..."
     }
   },
-  "open_threads": [],
+  "flags": {
+    "A_ignored_twice": false,
+    "A_curtain_fell": false,
+    "B_overridden_once": false,
+    "B_witnessed_real_choice": false,
+    "C_excluded_from_info": false,
+    "C_got_sincere_answer": false,
+    "player_chose_efficiency_over_care": false,
+    "player_showed_hesitation": false,
+    "triangle_tension_visible": false
+  },
   "conversation_log": []
 }
 ```
@@ -161,15 +179,20 @@ A：
 - `world_state.experiment_frame`
 - `world_state.active_fault_line`
 - `world_state.scarce_resource`
+- `world_state.route_lean`
+- 每个角色的 `affinity`
+- 每个角色的 `distance`
+- 每个角色的 `mask_on`
 - 每个角色的 `emotions`
 - 每个角色的 `intention`
 
 不建议随意改的部分：
 
 - `turn`
+- `schema_version`
 - `recent_public_events`
 - `beliefs_about_player`
-- `open_threads`
+- `flags`
 - `conversation_log`
 
 这些字段由程序运行时维护。
@@ -213,7 +236,7 @@ memory_curator
 2. 如果第一轮状态也要变化，同步改 `app.py` 和 `static/main.js` 的 `INITIAL_STATE`。
 3. 如果页面示例不符合新设定，改 `static/index.html`。
 4. 如果自动输入不够会推进事件，改 `app.py` 的 `generate_suggested_input(...)`。
-5. 启动项目后测试 3 到 5 轮，观察 JSON 中的 `social_field`、`open_threads` 和 `character_minds` 是否继承前文。
+5. 启动项目后测试 3 到 5 轮，观察 JSON 中的 `social_field`、`flags`、`route_lean` 和 `character_minds` 是否继承前文。
 
 ## 小型模板
 
@@ -232,8 +255,8 @@ memory_curator
 
 ```text
 场景默认张力：
-- 稀缺资源：这一轮只有一种方案、一个名额或一次公开发言机会。
+- 稀缺资源：这一轮只有一种方案、一个开场名额或一次公开署名机会。
 - 信息不对称：某人知道事实但不确定是否该公开。
-- 评价压力：所有人都知道表现会被记录，但不知道标准。
+- 温和压力：每个人都想让共创会顺利，但对“被看见”的需求不一样。
 - 边界试探：玩家可以请求帮助，但请求方式会影响角色是否感到被尊重。
 ```

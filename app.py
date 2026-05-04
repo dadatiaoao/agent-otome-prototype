@@ -16,40 +16,69 @@ BASE_DIR = Path(__file__).parent
 STATIC_DIR = BASE_DIR / "static"
 PROMPT_PATH = BASE_DIR / "prompts" / "system_prompt.txt"
 
-app = FastAPI(title="6-Layer Agent Social Experiment Dialogue Prototype")
+app = FastAPI(title="6-Layer Agent Co-Creation Dialogue Prototype")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 INITIAL_STATE: Dict[str, Any] = {
+    "schema_version": 2,
     "turn": 0,
     "world_state": {
-        "scene_goal": "在资源不透明的协作实验中暴露真实优先级",
-        "pressure": "偏高",
-        "experiment_frame": "三名角色知道自己在协作实验中，但不知道评价标准是否一致。",
-        "active_fault_line": "公开效率、私人信任、边界感三者无法同时被满足。",
-        "scarce_resource": "下一步只有一个人的方案能被优先采纳。",
+        "scene_goal": "完成海边旧书屋春日共创会的第一轮筹备，让每个人的投入被温柔而准确地看见",
+        "pressure": "温和但持续",
+        "experiment_frame": "四人正在为旧书屋的周末共创会分配展区、署名、主持顺序和信息公开方式。",
+        "active_fault_line": "公开认可、私人照顾、边界感三者无法同时被满足。",
+        "scarce_resource": "下一步只有一个人的提案能被放进共创会开场环节。",
+        "route_lean": "neutral",
         "recent_public_events": [],
     },
     "characters": {
         "A": {
-            "emotions": ["克制", "被测试感"],
+            "affinity": 0,
+            "distance": "stranger",
+            "mask_on": True,
+            "cracked_at": [],
+            "emotions": ["维持表演状态", "对筹备规则有轻微不满"],
             "beliefs_about_player": [],
-            "intention": "确认玩家是否只在需要正确答案时才靠近自己",
+            "intention": "在本轮确立自己作为开场环节主导者的位置",
         },
         "B": {
-            "emotions": ["轻快", "不安"],
+            "affinity": 0,
+            "distance": "stranger",
+            "mask_on": True,
+            "cracked_at": [],
+            "emotions": ["观察中", "保持距离"],
             "beliefs_about_player": [],
-            "intention": "争取让自己的判断被当成有效信息而不是情绪缓冲",
+            "intention": "等待玩家展示真实判断力",
         },
         "C": {
-            "emotions": ["安静", "戒备"],
+            "affinity": 0,
+            "distance": "stranger",
+            "mask_on": True,
+            "cracked_at": [],
+            "emotions": ["收集信息中", "尚未决定是否信任筹备节奏"],
             "beliefs_about_player": [],
-            "intention": "守住边界，同时验证玩家是否会主动分配可见责任",
+            "intention": "通过提问建立对玩家的完整模型",
         },
     },
-    "open_threads": [],
+    "flags": {
+        "A_ignored_twice": False,
+        "A_curtain_fell": False,
+        "B_overridden_once": False,
+        "B_witnessed_real_choice": False,
+        "C_excluded_from_info": False,
+        "C_got_sincere_answer": False,
+        "player_chose_efficiency_over_care": False,
+        "player_showed_hesitation": False,
+        "triangle_tension_visible": False,
+    },
     "conversation_log": [],
 }
+
+DISTANCE_STAGES = ("stranger", "acquaintance", "guarded_close", "intimate")
+ROUTE_LEANS = ("A_route", "B_route", "C_route", "collapse", "neutral")
+MAX_CONVERSATION_LOG = 20
+PIPELINE_CONVERSATION_LOG_LIMIT = 8
 
 
 class ApiConfig(BaseModel):
@@ -135,7 +164,7 @@ class SubjectiveMemory(BaseModel):
 class MemoryCurator(BaseModel):
     factual_memory: List[str]
     subjective_memory: SubjectiveMemory
-    open_threads: List[str]
+    flags: Dict[str, bool]
     state_patch: Dict[str, Any]
 
 
@@ -177,6 +206,8 @@ def merge_initial_state(default: Dict[str, Any], incoming: Dict[str, Any]) -> Di
 def safe_state(state: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     if not isinstance(state, dict):
         return deepcopy(INITIAL_STATE)
+    if state.get("schema_version") != INITIAL_STATE["schema_version"]:
+        return deepcopy(INITIAL_STATE)
     return merge_initial_state(INITIAL_STATE, state)
 
 
@@ -193,19 +224,53 @@ def append_unique(existing: List[str], incoming: List[str], limit: int) -> List[
     return last_items(result, limit)
 
 
+def clamp_affinity(value: Any) -> int:
+    try:
+        numeric = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(-30, min(100, numeric))
+
+
+def sanitize_character_patch(patch: Dict[str, Any]) -> Dict[str, Any]:
+    sanitized = dict(patch)
+    if "affinity" in sanitized:
+        sanitized["affinity"] = clamp_affinity(sanitized["affinity"])
+    if sanitized.get("distance") not in DISTANCE_STAGES:
+        sanitized.pop("distance", None)
+    if "mask_on" in sanitized:
+        sanitized["mask_on"] = bool(sanitized["mask_on"])
+    if "cracked_at" in sanitized:
+        cracked_at = sanitized["cracked_at"]
+        sanitized["cracked_at"] = cracked_at if isinstance(cracked_at, list) else []
+    return sanitized
+
+
 def apply_limited_patch(state: Dict[str, Any], patch: Dict[str, Any]) -> None:
     """Accept only simple top-level patch keys so model output cannot corrupt state shape."""
     if not isinstance(patch, dict):
         return
     world_patch = patch.get("world_state")
     if isinstance(world_patch, dict):
+        if "route_lean" in world_patch and world_patch["route_lean"] not in ROUTE_LEANS:
+            world_patch = dict(world_patch)
+            world_patch.pop("route_lean", None)
         state.setdefault("world_state", {}).update(world_patch)
 
     character_patch = patch.get("characters")
     if isinstance(character_patch, dict):
         for key in ("A", "B", "C"):
             if isinstance(character_patch.get(key), dict):
-                state.setdefault("characters", {}).setdefault(key, {}).update(character_patch[key])
+                state.setdefault("characters", {}).setdefault(key, {}).update(
+                    sanitize_character_patch(character_patch[key])
+                )
+
+    flag_patch = patch.get("flags")
+    if isinstance(flag_patch, dict):
+        flags = state.setdefault("flags", {})
+        for key, value in flag_patch.items():
+            if key in flags and value is True:
+                flags[key] = True
 
 
 def update_state(
@@ -229,9 +294,10 @@ def update_state(
         beliefs.extend(memory["subjective_memory"][character])
         char_state["beliefs_about_player"] = last_items(beliefs, 6)
 
-    state["open_threads"] = append_unique(
-        state.get("open_threads", []), memory["open_threads"], 6
-    )
+    flags = state.setdefault("flags", {})
+    for key, value in memory.get("flags", {}).items():
+        if key in flags and value is True:
+            flags[key] = True
 
     state.setdefault("conversation_log", []).append(
         {
@@ -240,14 +306,25 @@ def update_state(
             "dialogue": output["dialogue"],
         }
     )
-    state["conversation_log"] = last_items(state["conversation_log"], 10)
+    state["conversation_log"] = last_items(state["conversation_log"], MAX_CONVERSATION_LOG)
     apply_limited_patch(state, memory.get("state_patch", {}))
     return state
+
+
+def build_context_for_pipeline(state: Dict[str, Any]) -> Dict[str, Any]:
+    """Trim state sent to the main pipeline while preserving the useful trail."""
+    trimmed = deepcopy(state)
+    if "conversation_log" in trimmed:
+        trimmed["conversation_log"] = last_items(
+            trimmed["conversation_log"], PIPELINE_CONVERSATION_LOG_LIMIT
+        )
+    return trimmed
 
 
 def build_user_prompt(
     player_input: str, state: Dict[str, Any], retry_note: Optional[str] = None
 ) -> str:
+    context = build_context_for_pipeline(state)
     retry_block = ""
     if retry_note:
         retry_block = (
@@ -260,7 +337,7 @@ def build_user_prompt(
         "请根据当前状态与玩家输入，运行 single-call 6 层 Agent pipeline。"
         "\n必须完整输出 action_parser、character_minds、social_field、director、dialogue、memory_curator。"
         "\n当前状态 JSON：\n"
-        f"{json.dumps(state, ensure_ascii=False, indent=2)}"
+        f"{json.dumps(context, ensure_ascii=False, indent=2)}"
         "\n\n玩家输入：\n"
         f"{player_input}"
         f"{retry_block}"
@@ -345,6 +422,16 @@ def get_message_content(response_json: Dict[str, Any]) -> str:
     return content
 
 
+def build_retry_note(exc: AgentOutputError) -> str:
+    msg = str(exc)[:800]
+    hints = []
+    for field in ("dialogue", "memory_curator", "character_minds", "action_parser"):
+        if field in msg:
+            hints.append(field)
+    hint_str = f"（问题可能出在：{', '.join(hints)}）" if hints else ""
+    return f"{msg} {hint_str}".strip()
+
+
 async def call_agent_once(
     config: ApiConfig,
     player_input: str,
@@ -355,7 +442,7 @@ async def call_agent_once(
         {"role": "system", "content": read_system_prompt()},
         {"role": "user", "content": build_user_prompt(player_input, state, retry_note)},
     ]
-    response_json = await post_chat_completion(config, messages, temperature=0.7)
+    response_json = await post_chat_completion(config, messages, temperature=0.78)
     raw_output = get_message_content(response_json)
     try:
         parsed = extract_json(raw_output)
@@ -370,7 +457,7 @@ async def run_single_call_pipeline(
     try:
         return await call_agent_once(config, player_input, state)
     except AgentOutputError as first_error:
-        retry_note = f"{type(first_error).__name__}: {str(first_error)[:1200]}"
+        retry_note = build_retry_note(first_error)
         return await call_agent_once(config, player_input, state, retry_note)
 
 
@@ -383,30 +470,63 @@ async def run_step_by_step_pipeline(
 
 
 async def generate_suggested_input(config: ApiConfig, state: Dict[str, Any]) -> str:
+    context = {
+        "turn": state.get("turn", 0),
+        "route_lean": state.get("world_state", {}).get("route_lean", "neutral"),
+        "characters": {
+            key: {
+                "distance": value.get("distance"),
+                "mask_on": value.get("mask_on"),
+                "affinity": value.get("affinity"),
+                "intention": value.get("intention"),
+            }
+            for key, value in state.get("characters", {}).items()
+            if isinstance(value, dict)
+        },
+        "flags": state.get("flags", {}),
+        "recent_events": state.get("world_state", {}).get("recent_public_events", [])[-3:],
+    }
+
     messages = [
         {
             "role": "system",
             "content": (
-                "你是一个受约束的玩家输入建议器。只输出合法 JSON，不要输出 Markdown。"
-                "不要替玩家做重大决定，不要新增地点、组织、阴谋、战斗、死亡或突然离场。"
-                "目标不是讨好角色，而是提出一个能暴露关系张力、推进小事件的可执行行动。"
+                "你在模拟一个人在旧书屋共创会里，刚刚有了一个行动冲动的那一刻。"
+                "只输出合法 JSON，不要输出 Markdown，不要解释。"
+                "这个人不会用社交策略的眼光想问题，但他的选择会自然地照顾到某人、忽视某人、或在某人心里留下一个问号。"
+                "这个行动必须让下一轮剧情有明确可回应的变化，而不是只有气氛或暧昧细节。"
+                "不要替玩家做重大决定。不要新增地点、组织、突然离场或激烈冲突。"
             ),
         },
         {
             "role": "user",
             "content": (
-                "请根据当前状态，生成一句适合下一轮输入框使用的中文玩家行动。"
-                "要求：一句话，35 到 90 个中文字符；只推进一个小事件；必须包含一个具体动作和一个可被角色误解或质疑的取舍；"
-                "优先让玩家提出边界、排序、交换条件、公开验证、延迟回应或分配责任；"
-                "不要只安抚、只表白信任、只询问信息，也不要让所有人都被完美照顾；"
-                "不要写角色台词，不要写旁白，不要替角色回应。"
-                "\n当前状态 JSON：\n"
-                f"{json.dumps(state, ensure_ascii=False, indent=2)}"
+                "根据当前状态，写出玩家下一轮最可能自然做出的行动，一句话。"
+                "这句话必须推进一个具体的筹备事项，让角色下一轮能围绕它继续说话或行动。\n\n"
+                "这句话应该像一个人在安静的书屋里，忽然动了一下--"
+                "可能是把什么东西递过去，可能是在谁的便签上多写了一个字，"
+                "可能是回答了一个问题但声音刚好只有某人听到，"
+                "可能是在讨论结束时突然把椅子往某人那边挪了一点。"
+                "但这个动作要顺手改变一个真实安排，例如开场顺序、署名、留言展示范围、朗读人选、旧物摆放、谁保管某张便签。\n\n"
+                "要求：\n"
+                "- 40 到 80 个中文字符，一句话，写玩家的行动，不写旁白，不写角色反应\n"
+                "- 有具体的物理动作或语言，不是心理活动，不是情绪表达\n"
+                "- 必须明确推进一个筹备事项：安排、分配、确认、改动、暂缓或交给某人处理\n"
+                "- 有一个细节是只有某一个人能接收到的--但不直接说是给谁的\n"
+                "- 读起来像是这件事本来就会发生，不像是为了推进剧情刻意设计的\n"
+                "- 不要只写递东西、移动椅子、看向某人、写下无意义短句；动作之后必须留下一个下一轮要处理的结果\n"
+                "- 语气不要「任务式」，不要出现“我决定”“我提议”“我宣布”\n"
+                "- 禁止告白、道歉万能句、离开、战斗\n\n"
+                "可以使用的场景元素：书签、便签、茶杯、傍晚窗光、朗读、手写、靠窗座位、旧物、灯、气味、安静、某人的名字。\n\n"
+                "当前状态：\n"
+                f"{json.dumps(context, ensure_ascii=False, indent=2)}\n\n"
                 '\n输出格式：{"player_input":"..."}'
             ),
         },
     ]
-    response_json = await post_chat_completion(config, messages, temperature=0.9)
+    response_json = await post_chat_completion(
+        config, messages, temperature=1.05, use_response_format=True
+    )
     raw_output = get_message_content(response_json)
     parsed = extract_json(raw_output)
     suggestion = SuggestedInput.model_validate(parsed)

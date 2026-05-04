@@ -1,31 +1,55 @@
 const INITIAL_STATE = {
+  schema_version: 2,
   turn: 0,
   world_state: {
-    scene_goal: "在资源不透明的协作实验中暴露真实优先级",
-    pressure: "偏高",
-    experiment_frame: "三名角色知道自己在协作实验中，但不知道评价标准是否一致。",
-    active_fault_line: "公开效率、私人信任、边界感三者无法同时被满足。",
-    scarce_resource: "下一步只有一个人的方案能被优先采纳。",
+    scene_goal: "完成海边旧书屋春日共创会的第一轮筹备，让每个人的投入被温柔而准确地看见",
+    pressure: "温和但持续",
+    experiment_frame: "四人正在为旧书屋的周末共创会分配展区、署名、主持顺序和信息公开方式。",
+    active_fault_line: "公开认可、私人照顾、边界感三者无法同时被满足。",
+    scarce_resource: "下一步只有一个人的提案能被放进共创会开场环节。",
+    route_lean: "neutral",
     recent_public_events: [],
   },
   characters: {
     A: {
-      emotions: ["克制", "被测试感"],
+      affinity: 0,
+      distance: "stranger",
+      mask_on: true,
+      cracked_at: [],
+      emotions: ["维持表演状态", "对筹备规则有轻微不满"],
       beliefs_about_player: [],
-      intention: "确认玩家是否只在需要正确答案时才靠近自己",
+      intention: "在本轮确立自己作为开场环节主导者的位置",
     },
     B: {
-      emotions: ["轻快", "不安"],
+      affinity: 0,
+      distance: "stranger",
+      mask_on: true,
+      cracked_at: [],
+      emotions: ["观察中", "保持距离"],
       beliefs_about_player: [],
-      intention: "争取让自己的判断被当成有效信息而不是情绪缓冲",
+      intention: "等待玩家展示真实判断力",
     },
     C: {
-      emotions: ["安静", "戒备"],
+      affinity: 0,
+      distance: "stranger",
+      mask_on: true,
+      cracked_at: [],
+      emotions: ["收集信息中", "尚未决定是否信任筹备节奏"],
       beliefs_about_player: [],
-      intention: "守住边界，同时验证玩家是否会主动分配可见责任",
+      intention: "通过提问建立对玩家的完整模型",
     },
   },
-  open_threads: [],
+  flags: {
+    A_ignored_twice: false,
+    A_curtain_fell: false,
+    B_overridden_once: false,
+    B_witnessed_real_choice: false,
+    C_excluded_from_info: false,
+    C_got_sincere_answer: false,
+    player_chose_efficiency_over_care: false,
+    player_showed_hesitation: false,
+    triangle_tension_visible: false,
+  },
   conversation_log: [],
 };
 
@@ -108,6 +132,9 @@ function readConfig() {
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem("state") || "null");
+    if (saved && saved.schema_version !== INITIAL_STATE.schema_version) {
+      return clone(INITIAL_STATE);
+    }
     return mergeInitialState(INITIAL_STATE, saved);
   } catch {
     return clone(INITIAL_STATE);
